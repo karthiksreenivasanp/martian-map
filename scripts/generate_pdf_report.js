@@ -199,8 +199,8 @@ const htmlContent = `<!DOCTYPE html>
     <h1>MARTIAN MAP</h1>
     <div class="subtitle">Spacecraft Tablet Turn-by-Turn EVA Surface Walk Planner & Planetary HUD</div>
     <div class="meta-grid">
+      <div class="meta-item" style="grid-column: span 2;"><strong>Authors:</strong> Karthik Sreenivasan, Akshaya R, Sreevals R, Sreelakshmi, Shibil, Ishaq</div>
       <div class="meta-item"><strong>Competition:</strong> 2026 NASA Space Apps Challenge</div>
-      <div class="meta-item"><strong>Author:</strong> karthiksreenivasanp</div>
       <div class="meta-item"><strong>Live URL:</strong> https://www.karthiksreenivasanp.social/martian-map/</div>
       <div class="meta-item"><strong>GitHub Repo:</strong> https://github.com/karthiksreenivasanp/martian-map</div>
       <div class="meta-item"><strong>Reference Datum:</strong> IAU 2000 Mars (R = 3,396,190 m)</div>

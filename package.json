@@ -2,6 +2,14 @@
   "name": "martian-map",
   "version": "1.0.0",
   "description": "Martian Map - Spacecraft tablet turn-by-turn EVA surface walk planner and HUD",
+  "contributors": [
+    "Karthik Sreenivasan",
+    "Akshaya R",
+    "Sreevals R",
+    "Sreelakshmi",
+    "Shibil",
+    "Ishaq"
+  ],
   "type": "module",
   "scripts": {
     "dev": "vite",

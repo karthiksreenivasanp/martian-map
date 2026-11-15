@@ -89,3 +89,12 @@ Open `http://localhost:4173/martian-map/` in a browser.
 - Production Build: Vite production build succeeded in 235 ms with base path `/martian-map/`.
 - Headless Browser Verification: Verified on Chrome at viewports 1280x800, 1024x768, and 768x1024 with 0 console errors and 0 CSP violations.
 - Asset Size Compliance: Total dist size 88 MB (well within 1 GB limit), all files below 50 MB GitHub Pages warning threshold.
+
+## Authors and Project Team
+
+- Karthik Sreenivasan
+- Akshaya R
+- Sreevals R
+- Sreelakshmi
+- Shibil
+- Ishaq
