@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+
+# Production build output
+dist/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Media captures, recordings and archives
+*.mov
+*.mp4
+*.zip
+Screen Recording*
+screen_recording*
+mars-project.zip
+
+# Loose legacy scratch files, root dumps, and backups
+*.bak.html
+*.archive-atlas.html
+directions.html
+eva-navigator.html
+spike.html
+spike_screenshot.png
+PIA25407.jpg
+check_clean_sky_mountain.jpg
+crop_mountain.png
+crop_sky_raw.jpg
+patch.png
+small_pia.jpg
+sojourner_crop.jpg
+test_mountain_clean.jpg
+pano*.jpg
+styles.css
+css/
+js/
+assets/
+test_4k/
+__pycache__/
+*.pyc

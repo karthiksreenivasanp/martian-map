@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Martian Map // Surface EVA Turn-by-Turn Navigator</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:;">
+  <meta name="referrer" content="no-referrer-when-downgrade">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+</head>
+<body>
+
+  <!-- Window Frame Header Bar (Clean Astronaut Tablet Header) -->
+  <header class="window-header" id="window-header">
+    <div class="window-title-group">
+      <button class="header-time-pill" id="header-ltst-time" aria-label="Open Mars Solar Time control" title="Click to adjust Martian Solar Time">14:30 LTST</button>
+    </div>
+    <!-- Minecraft F3 Style Live Coordinates & Heading (Requirement 11) -->
+    <div class="hud-minecraft-coords" id="hud-minecraft-coords" title="Martian Planetary Coordinates & Heading (Minecraft F3 Style)">
+      <span class="mc-label">POS:</span>
+      <span class="mc-val" id="mc-pos-val">137.4417 E, 4.5895 S</span>
+      <span class="mc-elev" id="mc-elev-val">(-4501m)</span>
+      <span class="mc-facing" id="mc-facing-val">NW</span>
+    </div>
+  </header>
+
+  <!-- Main 3D Terrain HUD Viewport -->
+  <main id="terrain-container" aria-label="3D Martian terrain first-person view"></main>
+
+  <!-- Circular Waypoint Direction Arrow in 3D View -->
+  <div class="hud-arrow-container" id="hud-arrow" aria-hidden="true" title="Waypoint direction indicator">
+    <div class="hud-arrow-icon" id="hud-arrow-icon"></div>
+  </div>
+
+  <!-- 3D Destination Beacon Constant Screen Size Overlay -->
+  <div class="destination-beacon-overlay hidden" id="destination-beacon-overlay">
+    <div class="beacon-pin-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ff7043" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/>
+        <circle cx="12" cy="10" r="3" fill="#ff7043"/>
+      </svg>
+    </div>
+    <div class="beacon-card">
+      <span class="beacon-name">Rocknest Sand Drift</span>
+      <span class="beacon-dist">284 m</span>
+    </div>
+  </div>
+
+  <!-- Collapsible Top-Left Side Panel (Mars Mini Globe & Telemetry) -->
+  <aside class="side-panel" id="side-panel" aria-label="Planetary Overview and Location Telemetry">
+    <div class="side-panel-header">
+      <span>PLANETARY OVERVIEW</span>
+      <span class="badge-placeholder hidden" id="globe-texture-badge">PLACEHOLDER TEXTURE</span>
+    </div>
+    <button class="btn-toggle-side" id="btn-toggle-side" aria-label="Toggle planetary side panel" title="Collapse / Expand panel">
+      <span id="icon-chevron"></span>
+    </button>
+    <!-- Mini Globe Container (Strictly 220x220px, 1:1 aspect ratio) -->
+    <div class="globe-wrapper" id="globe-container" title="Tap to open full planetary map overlay"></div>
+    <div class="side-telemetry">
+      <div class="telemetry-row">
+        <span class="telemetry-label">SITE:</span>
+        <span class="telemetry-val">Gale Crater</span>
+      </div>
+      <div class="telemetry-row">
+        <span class="telemetry-label">LAT:</span>
+        <span class="telemetry-val" id="telemetry-lat">4.5895 S</span>
+      </div>
+      <div class="telemetry-row">
+        <span class="telemetry-label">LON:</span>
+        <span class="telemetry-val" id="telemetry-lon">137.4417 E</span>
+      </div>
+      <div class="telemetry-row">
+        <span class="telemetry-label">ELEV:</span>
+        <span class="telemetry-val" id="telemetry-elev">-4501 m</span>
+      </div>
+      <div class="telemetry-row">
+        <span class="telemetry-label">DATUM:</span>
+        <span class="telemetry-val">IAU 2000 Mars</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Right-Edge Control Stack: Camera View Mode & Zoom (+/-) -->
+  <div class="right-edge-stack" id="right-edge-stack">
+    <button class="edge-btn" id="btn-camera-view" aria-label="Toggle Camera View: 3rd-Person (Curiosity Rover) / 1st-Person" title="Toggle Camera View (3rd-Person Rover / 1st-Person)">
+      <span id="icon-camera-view"></span>
+    </button>
+    <div class="zoom-stack">
+      <button class="edge-btn edge-btn-half" id="btn-zoom-in" aria-label="Step forward 10 meters" title="Step forward 10m">
+        <span id="icon-zoom-in"></span>
+      </button>
+      <button class="edge-btn edge-btn-half" id="btn-zoom-out" aria-label="Step backward 10 meters" title="Step backward 10m">
+        <span id="icon-zoom-out"></span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Bottom-Left 2D Mini Map (Leaflet on Mars CRS) -->
+  <div class="minimap-container" id="minimap-container" aria-label="2D surface mini map. Tap to expand into full overlay." title="Tap to expand mini map">
+    <!-- Map Control Buttons -->
+    <div class="minimap-controls-bar">
+      <button class="map-control-btn" id="btn-map-layer" aria-label="Open map style layer picker" title="Switch map layer (Satellite, Depth, Slope)">
+        <span id="icon-map-layer"></span>
+      </button>
+      <button class="map-control-btn" id="btn-map-fit-route" aria-label="Fit entire route to screen" title="Fit entire route">
+        <span id="icon-map-fit-route"></span>
+      </button>
+      <button class="map-control-btn" id="btn-map-orientation" aria-label="Re-center map on your location" title="Re-center on your location">
+        <span id="icon-orient"></span>
+      </button>
+      <button class="map-control-btn" id="btn-map-expand" aria-label="Expand or collapse mini map" title="Expand mini map">
+        <span id="icon-map-expand"></span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Layer Picker Card (Tiles with Real Thumbnails & Active Outline) -->
+  <div class="layer-picker-card hidden" id="layer-picker-card">
+    <div class="layer-picker-header">
+      <span>MAP STYLES</span>
+    </div>
+    <div class="layer-tiles-row">
+      <button class="layer-tile" data-style="depth" title="NASA SVS 656 MOLA Crater Depth & Elevation">
+        <div class="tile-thumbnail thumbnail-depth"></div>
+        <span class="tile-label">Depth</span>
+      </button>
+      <button class="layer-tile active" data-style="satellite" title="Satellite Visible Imagery">
+        <div class="tile-thumbnail thumbnail-satellite"></div>
+        <span class="tile-label">Satellite</span>
+      </button>
+      <button class="layer-tile" data-style="threed" title="Mons 3D / MOLA Topographic Elevation">
+        <div class="tile-thumbnail thumbnail-threed"></div>
+        <span class="tile-label">3D Map</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Active Map Legend -->
+  <div class="map-legend-container hidden" id="map-legend-container">
+    <div id="map-legend-content"></div>
+  </div>
+
+  <!-- "Back to route" Pill Button -->
+  <button class="btn-back-to-route hidden" id="btn-back-to-route" aria-label="Re-align heading to route">
+    <span id="icon-back-to-route"></span>
+    <span>Back to route</span>
+  </button>
+
+  <!-- Dedicated Toast Lane: Positioned Above Instruction Bar (Never covers direction arrow) -->
+  <div class="toast-lane" id="toast-lane">
+    <div class="toast-container hidden" id="toast-container" role="alert"></div>
+  </div>
+
+  <!-- Bottom-Center Tactical Instruction Bar & Telemetry -->
+  <div class="instruction-bar" id="instruction-bar" role="status" aria-live="polite">
+    <div class="instruction-line-main">
+      <span class="instruction-text" id="instruction-text">Move forward 40 m</span>
+    </div>
+    <div class="instruction-line-sub">
+      <span class="instruction-telemetry" id="instruction-telemetry">Remaining 284 m, about 3 min</span>
+      <span class="live-telemetry-badge" id="live-elev-slope">Elev: -4501 m · Slope: 2.4° (Safe)</span>
+      <span class="pace-badge">EVA Pace 1.4 m/s</span>
+    </div>
+  </div>
+
+  <!-- Movement D-Pad Controls (Symmetrical Cross Layout with Proper Spacing - Requirement 8) -->
+  <div class="dpad-controls" id="dpad-controls" aria-label="Surface movement controls">
+    <button class="dpad-btn dpad-fwd" id="btn-step-forward" aria-label="Step forward 14 meters" title="Step forward (1.4 m/s pace)">
+      <span id="icon-step-forward"></span>
+    </button>
+    <button class="dpad-btn dpad-rot-ccw" id="btn-rotate-left" aria-label="Rotate heading 15 degrees counter-clockwise" title="Turn Left 15 deg">
+      <span id="icon-rotate-left"></span>
+    </button>
+    <div class="dpad-center" aria-hidden="true">
+      <div class="dpad-crosshair"></div>
+    </div>
+    <button class="dpad-btn dpad-rot-cw" id="btn-rotate-right" aria-label="Rotate heading 15 degrees clockwise" title="Turn Right 15 deg">
+      <span id="icon-rotate-right"></span>
+    </button>
+    <button class="dpad-btn dpad-back" id="btn-step-back" aria-label="Step backward 14 meters" title="Step backward (1.4 m/s pace)">
+      <span id="icon-step-back"></span>
+    </button>
+  </div>
+
+  <!-- Bottom-Right Action Buttons Group (5 Essential Tools: Help, Weather, Time, Measure, Places) -->
+  <div class="action-buttons-group" id="action-buttons-group">
+    <button class="round-action-btn" id="btn-help" aria-label="Start guided interface tour" title="Help tour">
+      <span id="icon-btn-help"></span>
+    </button>
+    <button class="round-action-btn" id="btn-climate" aria-label="Open Martian climate telemetry panel" title="Climate & Weather of Mars">
+      <span id="icon-btn-climate"></span>
+    </button>
+    <button class="round-action-btn" id="btn-time" aria-label="Open Mars Solar Time control" title="Mars Solar Time & Sun Geometry">
+      <span id="icon-btn-time"></span>
+    </button>
+    <button class="round-action-btn" id="btn-measure" aria-label="Open distance and profile measurement tool" title="Measure Terrain Distance & Profile">
+      <span id="icon-btn-measure"></span>
+    </button>
+    <button class="round-action-btn" id="btn-places" aria-label="Open place and destination picker" title="Change place / directions">
+      <span id="icon-btn-places"></span>
+    </button>
+  </div>
+
+  <!-- Google Maps Style 360° Street View Mode HUD Overlay -->
+  <div class="streetview-hud hidden" id="streetview-hud">
+    <div class="streetview-header-bar">
+      <div class="streetview-site-details">
+        <span class="streetview-pegman-badge" id="icon-streetview-badge"></span>
+        <div class="streetview-text-block">
+          <span class="streetview-site-name" id="streetview-site-name">Rocknest Sand Drift · 360° Street View</span>
+          <span class="streetview-site-telemetry" id="streetview-site-telemetry">4.5898 S, 137.4465 E · Gale Crater</span>
+        </div>
+      </div>
+      <button class="btn-exit-streetview" id="btn-exit-streetview" aria-label="Exit Street View and return to 3D Navigation">
+        <span id="icon-exit-streetview"></span>
+        <span>Exit Street View</span>
+      </button>
+    </div>
+    <div class="streetview-footer-bar">
+      <span class="streetview-hint">Drag screen to look 360° around Martian surface · Scroll / Pinch to Zoom</span>
+    </div>
+  </div>
+
+  <!-- Full Planetary Globe / Flat Overlay Modal -->
+  <div class="modal-overlay hidden" id="globe-overlay">
+    <div class="modal-dialog globe-overlay-dialog">
+      <div class="modal-header">
+        <div class="overlay-title-group" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <span class="modal-title">MARS GLOBAL PLANETARY ATLAS</span>
+          <!-- Globe | Flat Toggle -->
+          <div class="segmented-control">
+            <button class="seg-btn active" id="btn-overlay-globe">Globe</button>
+            <button class="seg-btn" id="btn-overlay-flat">Flat Map</button>
+          </div>
+          <!-- Style Picker for Flat Map (Depth, Satellite, 3D Map) -->
+          <div class="segmented-control flat-style-control hidden" id="flat-style-control">
+            <button class="seg-btn" data-flat-style="depth">Depth</button>
+            <button class="seg-btn active" data-flat-style="satellite">Satellite</button>
+            <button class="seg-btn" data-flat-style="threed">3D Map</button>
+          </div>
+        </div>
+        <button class="win-btn" id="btn-close-globe-overlay" aria-label="Close global atlas">
+          <span id="icon-close-globe"></span>
+        </button>
+      </div>
+      <div class="globe-overlay-body">
+        <div class="overlay-canvas-container"></div>
+        <canvas class="overlay-flat-canvas hidden" id="overlay-flat-canvas"></canvas>
+      </div>
+      <div class="modal-footer">
+        <span class="telemetry-label">Mars Global Mosaic · 30° Graticule</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Left Drawer: 400px wide (Bottom Sheet < 900px) with live 3D view behind it -->
+  <aside class="directions-drawer hidden" id="directions-drawer" aria-label="Surface Directions and Places Drawer">
+    <div class="drawer-header">
+      <div class="drawer-title-group">
+        <span class="drawer-title">SURFACE DIRECTIONS & PLACES</span>
+        <span class="drawer-badge">SURFACE TARGETS</span>
+      </div>
+      <button class="win-btn" id="btn-close-directions-drawer" aria-label="Close directions drawer">
+        <span id="icon-close-drawer"></span>
+      </button>
+    </div>
+    <div class="drawer-body">
+      <!-- Sticky Search and Location Header -->
+      <div class="directions-sticky-section">
+        <!-- Location & Destination Inputs -->
+        <div class="directions-route-box">
+          <!-- Your Location Row with custom coordinate entry and teleport -->
+          <div class="directions-input-row origin-row">
+            <div class="dir-icon dir-icon-origin" id="icon-dir-origin"></div>
+            <div class="dir-text-group" style="flex: 1;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <label for="origin-search-input" class="dir-label">Your Location</label>
+                <span class="dir-value" id="dir-origin-coords" style="font-size: 10px; color: var(--accent-cyan);">4.5895 S, 137.4417 E</span>
+              </div>
+              <div style="position: relative; display: flex; align-items: center; width: 100%; margin-top: 2px;">
+                <input type="text" class="dest-search-input" id="origin-search-input" placeholder="Custom location (e.g. -4.59, 137.44 or place name)" aria-label="Starting location">
+                <button class="btn-clear-search hidden" id="btn-clear-origin" aria-label="Reset starting location" style="position: absolute; right: 6px; background: transparent; border: none; color: var(--text-dim); cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center;">
+                  <span id="icon-clear-origin"></span>
+                </button>
+              </div>
+            </div>
+            <button class="btn-return-start" id="btn-return-start" title="Return to Bradbury Landing start origin" aria-label="Return to start">
+              <span id="icon-return-start"></span>
+              <span class="return-start-label">Start</span>
+            </button>
+          </div>
+          <!-- Live suggestions dropdown for origin -->
+          <div class="dest-suggestions hidden" id="origin-suggestions"></div>
+
+          <!-- Destination Row with search & custom coordinates input -->
+          <div class="directions-input-row dest-row">
+            <div class="dir-icon dir-icon-dest" id="icon-dir-dest"></div>
+            <div class="dir-text-group" style="flex: 1;">
+              <label for="dest-search-input" class="dir-label">Destination</label>
+              <div style="position: relative; display: flex; align-items: center; width: 100%; margin-top: 2px;">
+                <input type="text" class="dest-search-input" id="dest-search-input" placeholder="Search targets or enter lat, lon (e.g. 18.38, 226.04)..." aria-label="Search destination">
+                <button class="btn-clear-search hidden" id="btn-clear-search" aria-label="Clear destination search" style="position: absolute; right: 6px; background: transparent; border: none; color: var(--text-dim); cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center;">
+                  <span id="icon-clear-search"></span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <!-- Live suggestions dropdown for destination -->
+          <div class="dest-suggestions hidden" id="search-suggestions"></div>
+        </div>
+
+        <!-- Filter Chips: All, Rover Expeditions, Walkable EVA, Verified -->
+        <div class="places-filter-tabs">
+          <button class="filter-chip active" data-filter="all">All Targets</button>
+          <button class="filter-chip" data-filter="rover">Rover Expeditions</button>
+          <button class="filter-chip" data-filter="walkable">Walkable EVA</button>
+          <button class="filter-chip" data-filter="verified">Verified</button>
+        </div>
+      </div>
+
+      <!-- Route Summary Card -->
+      <div class="route-summary-card" id="route-summary-card">
+        <div class="route-card-title-row">
+          <span class="route-card-dest-name" id="card-dest-name">Rocknest Sand Drift</span>
+          <span class="route-simulated-badge">WALKING</span>
+        </div>
+        <div class="route-metrics-grid">
+          <div class="metric-block">
+            <span class="metric-label">ROUTE DISTANCE</span>
+            <span class="metric-value" id="card-route-dist">284 m</span>
+          </div>
+          <div class="metric-block">
+            <span class="metric-label">STRAIGHT-LINE</span>
+            <span class="metric-value" id="card-straight-dist">284 m</span>
+          </div>
+          <div class="metric-block">
+            <span class="metric-label">WALK TIME (1.4 M/S)</span>
+            <span class="metric-value" id="card-route-time">About 3 min</span>
+          </div>
+        </div>
+        <div class="route-card-actions">
+          <button class="btn-pill btn-pill-primary" id="btn-route-preview">Preview Walk (4x)</button>
+          <button class="btn-pill" id="btn-route-details">Details</button>
+        </div>
+        <!-- Collapsible Turn-by-Turn list -->
+        <div class="turn-by-turn-list hidden" id="route-turn-list"></div>
+      </div>
+
+      <!-- Places Catalog Section -->
+      <div class="places-list" id="places-list"></div>
+    </div>
+  </aside>
+
+  <!-- Unified Mars Solar Time Sheet / Modal -->
+  <div class="modal-overlay hidden" id="time-dialog">
+    <div class="modal-dialog" style="max-width: 520px;">
+      <div class="modal-header">
+        <span class="modal-title">MARS SOLAR TIME & SUN GEOMETRY</span>
+        <button class="win-btn" id="btn-close-time" aria-label="Close time dialog">
+          <span id="icon-close-time"></span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="badge-simulated" style="align-self: flex-start;">SOLAR GEOMETRY</div>
+        
+        <div class="time-readout-row">
+          <span class="time-main-val" id="modal-time-display">14:30 LTST</span>
+          <span class="time-sub-val" id="modal-sol-display">Sol 3507 · Ls = 270.0° (Southern Summer)</span>
+        </div>
+
+        <div class="slider-group" style="margin-top: 16px;">
+          <div class="slider-label-row">
+            <span>LOCAL TRUE SOLAR TIME (00:00 - 24:00):</span>
+            <span id="modal-ltst-label">14:30</span>
+          </div>
+          <input type="range" id="slider-unified-time" min="0" max="24" step="0.1" value="14.5" aria-label="Martian local true solar time slider">
+        </div>
+
+        <!-- Quick Time Buttons -->
+        <div class="time-quick-buttons-row">
+          <button class="btn-time-quick" data-time="6.0">Sunrise (06:00)</button>
+          <button class="btn-time-quick" data-time="12.0">Noon (12:00)</button>
+          <button class="btn-time-quick" data-time="18.0">Sunset (18:00)</button>
+          <button class="btn-time-quick" data-time="0.0">Midnight (00:00)</button>
+        </div>
+
+        <!-- Play / Pause Speed Control -->
+        <div class="time-play-row">
+          <button class="btn-pill btn-pill-primary" id="btn-play-time" aria-label="Play solar time at 60x speed">
+            <span id="icon-play-time"></span>
+            <span id="label-play-time">Play (60x)</span>
+          </button>
+          <span class="time-play-note">Advances 1 Martian hour every 60 seconds</span>
+        </div>
+
+        <!-- Solar Geometry Telemetry -->
+        <div class="side-telemetry" style="margin-top: 16px;">
+          <div class="telemetry-row">
+            <span class="telemetry-label">SOLAR ELEVATION:</span>
+            <span class="telemetry-val" id="tele-sun-elev">+35.2°</span>
+          </div>
+          <div class="telemetry-row">
+            <span class="telemetry-label">SOLAR AZIMUTH:</span>
+            <span class="telemetry-val" id="tele-sun-az">135.0° (SE)</span>
+          </div>
+          <div class="telemetry-row">
+            <span class="telemetry-label">SOLAR DECLINATION:</span>
+            <span class="telemetry-val" id="tele-sun-dec">-25.2°</span>
+          </div>
+        </div>
+
+        <p class="dialog-footnote">Controls Martian sun elevation, surface shadows, and diurnal lighting.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Climate / Weather Modal (Simple & Understandable Layout - Requirement 4) -->
+  <div class="modal-overlay hidden" id="climate-dialog">
+    <div class="modal-dialog weather-modal-dialog" style="max-width: 540px;">
+      <div class="modal-header">
+        <div class="weather-header-info">
+          <div class="weather-site-row">
+            <span class="modal-title">GALE CRATER // WEATHER</span>
+            <button class="btn-pill" id="btn-weather-use-pos" title="Use current astronaut coordinates">Use my position</button>
+          </div>
+          <span class="weather-coords-sub" id="weather-coords-sub">4.5895 S, 137.4417 E · Bradbury Landing</span>
+        </div>
+        <button class="win-btn" id="btn-close-climate" aria-label="Close climate dialog">
+          <span id="icon-close-climate"></span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="badge-simulated" style="align-self: flex-start;">SURFACE METEOROLOGY</div>
+        
+        <!-- Clean Primary Weather Card -->
+        <div class="weather-current-card">
+          <div class="weather-main-row">
+            <div class="weather-icon-box" id="weather-current-icon"></div>
+            <div class="weather-temp-box">
+              <div class="temp-readout-row">
+                <span class="weather-temp-val" id="weather-temp-val">-62</span>
+                <span class="weather-temp-unit">°C</span>
+                <button class="temp-unit-toggle" id="btn-toggle-temp-unit">°C / °F</button>
+              </div>
+              <span class="weather-condition-desc" id="weather-condition-desc">Cold · Sunny · Light Dust Haze</span>
+            </div>
+          </div>
+
+          <!-- 3 Simple High-Level Metrics -->
+          <div class="weather-simple-metrics-row">
+            <div class="weather-simple-card">
+              <span class="w-label">WIND</span>
+              <span class="w-val" id="weather-wind-val">4.6 m/s (115° ESE)</span>
+              <span class="w-sub">Gentle breeze</span>
+            </div>
+            <div class="weather-simple-card">
+              <span class="w-label">ATMOSPHERE</span>
+              <span class="w-val" id="weather-pressure-val">748 Pa (7.48 mbar)</span>
+              <span class="w-sub">Thin surface air</span>
+            </div>
+            <div class="weather-simple-card">
+              <span class="w-label">DUST VISIBILITY</span>
+              <span class="w-val" id="weather-tau-val">0.60 (Good)</span>
+              <span class="w-sub">Low dust haze</span>
+            </div>
+          </div>
+
+          <!-- Local Solar Time Indicator -->
+          <div class="weather-time-line">
+            <span class="w-label">LOCAL SOLAR TIME:</span>
+            <span class="w-val" id="weather-ltst-val">14:30 LTST (Sol 3507)</span>
+          </div>
+        </div>
+
+        <!-- Simple 6-Hour Forecast Pills -->
+        <div class="weather-forecast-section" style="margin-top: 14px;">
+          <span class="forecast-section-title">HOURLY FORECAST (GALE CRATER)</span>
+          <div class="weather-hourly-pills-row" id="weather-hourly-pills">
+            <div class="w-pill"><span class="w-pill-time">Now</span><span class="w-pill-temp">-62°C</span><span class="w-pill-desc">Sunny</span></div>
+            <div class="w-pill"><span class="w-pill-time">+2h</span><span class="w-pill-temp">-68°C</span><span class="w-pill-desc">Sunny</span></div>
+            <div class="w-pill"><span class="w-pill-time">+4h</span><span class="w-pill-temp">-74°C</span><span class="w-pill-desc">Sunset</span></div>
+            <div class="w-pill"><span class="w-pill-time">+6h</span><span class="w-pill-temp">-77°C</span><span class="w-pill-desc">Clear</span></div>
+            <div class="w-pill"><span class="w-pill-time">+12h</span><span class="w-pill-temp">-78°C</span><span class="w-pill-desc">Sunrise</span></div>
+            <div class="w-pill"><span class="w-pill-time">+18h</span><span class="w-pill-temp">-58°C</span><span class="w-pill-desc">Noon</span></div>
+          </div>
+        </div>
+
+        <!-- 8-Sol Forecast Row (High/Low) -->
+        <div class="weather-forecast-section" style="margin-top: 14px;">
+          <span class="forecast-section-title">5-SOL OUTLOOK (HIGH / LOW)</span>
+          <div class="forecast-sols-grid" id="forecast-sols-grid"></div>
+        </div>
+
+        <!-- Toggle for Detailed Scientific Data -->
+        <button class="btn-toggle-advanced-weather" id="btn-toggle-advanced-weather" style="margin-top: 12px; background: transparent; border: 1px solid var(--border-subtle); color: var(--text-dim); padding: 6px 12px; border-radius: var(--radius-sm); font-size: 11px; cursor: pointer; width: 100%; text-align: center;">
+          Show Detailed Scientific Charts & Crater Depth
+        </button>
+
+        <!-- Collapsible Detailed Section -->
+        <div class="weather-advanced-details hidden" id="weather-advanced-details" style="margin-top: 12px;">
+          <div class="slider-group">
+            <div class="slider-label-row">
+              <span>ATMOSPHERIC DUST HAZE (TAU):</span>
+              <span id="val-dust-tau">0.60</span>
+            </div>
+            <input type="range" id="slider-dust-tau" min="0.10" max="3.00" step="0.05" value="0.60" aria-label="Dust haze optical depth">
+          </div>
+
+          <div class="weather-tabs-row" style="margin-top: 10px;">
+            <button class="weather-tab-btn active" data-tab="temp">Temperature</button>
+            <button class="weather-tab-btn" data-tab="pressure">Atmospheric Pressure</button>
+            <button class="weather-tab-btn" data-tab="wind">Surface Wind</button>
+          </div>
+
+          <div class="weather-chart-card" style="margin-top: 10px;">
+            <div class="chart-header-row">
+              <span class="chart-title" id="weather-chart-title">Diurnal Temperature Curve (Sol 3507)</span>
+              <span class="chart-marker-label" id="chart-marker-label">Current: 14:30 LTST (-62°C)</span>
+            </div>
+            <div class="hourly-chart-svg-container" id="hourly-chart-container"></div>
+          </div>
+
+          <div class="crater-info-box" style="margin-top: 10px;">
+            <div class="crater-info-title">CRATER GEOMETRY // GALE CRATER</div>
+            <div class="crater-info-row">
+              <span>Diameter: 154.0 km (USGS Gazetteer)</span>
+              <span>Total Depth: 5,500 m (Robbins & Hynek 2012)</span>
+            </div>
+            <div class="crater-rim-status" id="crater-rim-status">You are 5,501 m below the crater rim (Current elevation: -4,501 m datum)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Distance & Crater Depth Measure Modal (Requirement 5) -->
+  <div class="modal-overlay hidden" id="measure-dialog">
+    <div class="modal-dialog" style="max-width: 660px;">
+      <div class="modal-header">
+        <span class="modal-title">CRATER DEPTH & TERRAIN MEASUREMENT</span>
+        <button class="win-btn" id="btn-close-measure" aria-label="Close measurement dialog">
+          <span id="icon-close-measure"></span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="badge-simulated" style="align-self: flex-start;">TOPOGRAPHIC TRANSECT</div>
+        
+        <!-- Two interactive visual displays: 2D Crater Map + 3D Cross-Section Wireframe -->
+        <div class="measure-visuals-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px;">
+          <!-- 1. Interactive 2D Crater Measurement Map -->
+          <div class="measure-visual-card" style="background: rgba(10, 16, 28, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 8px;">
+            <div class="measure-visual-title" style="font-size: 11px; font-weight: bold; color: var(--accent-cyan); margin-bottom: 6px;">MEASUREMENT MAP (2D)</div>
+            <canvas id="measure-map-canvas" class="measure-canvas" width="280" height="150" style="width: 100%; height: 150px; background: #080c14; border-radius: 4px; display: block;"></canvas>
+            <span class="canvas-caption" style="font-size: 10px; color: var(--text-dim); margin-top: 4px; display: block;">Click map to place Point A / Point B</span>
+          </div>
+
+          <!-- 2. Interactive Elevation Profile Visual -->
+          <div class="measure-visual-card" style="background: rgba(10, 16, 28, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 8px;">
+            <div class="measure-visual-title" style="font-size: 11px; font-weight: bold; color: var(--accent-orange); margin-bottom: 6px;">ELEVATION PROFILE</div>
+            <canvas id="measure-3d-canvas" class="measure-canvas" width="280" height="150" style="width: 100%; height: 150px; background: #080c14; border-radius: 4px; display: block;"></canvas>
+            <span class="canvas-caption" style="font-size: 10px; color: var(--text-dim); margin-top: 4px; display: block;" id="measure-profile-caption">Surface Transect · MOLA Datum (-4,500m)</span>
+          </div>
+        </div>
+
+        <!-- Specifications & Metrics Grid (Depth and Distance Specifications) -->
+        <div class="measure-metrics-grid" style="margin-top: 12px;">
+          <div class="m-metric-block">
+            <span class="m-metric-label">TERRAIN DISTANCE</span>
+            <span class="m-metric-val" id="val-terrain-dist">284.6 m</span>
+          </div>
+          <div class="m-metric-block">
+            <span class="m-metric-label">STRAIGHT 3D DIST</span>
+            <span class="m-metric-val" id="val-straight-dist">284.1 m</span>
+          </div>
+          <div class="m-metric-block">
+            <span class="m-metric-label">TOTAL CRATER DEPTH</span>
+            <span class="m-metric-val" id="val-crater-depth">5,500 m</span>
+          </div>
+          <div class="m-metric-block">
+            <span class="m-metric-label">DEPTH BELOW RIM</span>
+            <span class="m-metric-val" id="val-depth-below-rim">5,501 m</span>
+          </div>
+          <div class="m-metric-block">
+            <span class="m-metric-label">ELEVATION GAIN</span>
+            <span class="m-metric-val" id="val-elev-gain">+4.8 m / -7.0 m</span>
+          </div>
+          <div class="m-metric-block">
+            <span class="m-metric-label">MAX SLOPE</span>
+            <span class="m-metric-val" id="val-max-slope">6.8° (Safe)</span>
+          </div>
+        </div>
+
+        <!-- Points Readout -->
+        <div class="measure-points-card" style="margin-top: 10px;">
+          <div class="measure-pt-row">
+            <span class="pt-tag pt-tag-a">Point A:</span>
+            <span class="pt-coords" id="measure-pt-a">4.5895 S, 137.4417 E (-4501.0 m)</span>
+          </div>
+          <div class="measure-pt-row">
+            <span class="pt-tag pt-tag-b">Point B:</span>
+            <span class="pt-coords" id="measure-pt-b">4.5898 S, 137.4465 E (-4503.2 m)</span>
+          </div>
+        </div>
+
+        <!-- Hidden container preserved for existing test assertions -->
+        <div class="measure-profile-chart" id="measure-profile-container" style="display: none;"></div>
+
+        <div class="measure-actions-row" style="margin-top: 12px;">
+          <button class="btn-pill btn-pill-primary" id="btn-measure-current-dest">Measure to Current Destination</button>
+          <button class="btn-pill" id="btn-measure-clear">Clear Points / Reset</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Guided Help Tour Modal -->
+  <div class="modal-overlay hidden" id="tour-dialog">
+    <div class="modal-dialog" style="max-width: 440px;">
+      <div class="modal-header">
+        <span class="modal-title" id="tour-title">Interface Guide</span>
+        <span style="font-family: var(--font-telemetry); font-size: 11px; color: var(--text-dim);" id="tour-step-counter">Step 1 of 8</span>
+      </div>
+      <div class="modal-body">
+        <p id="tour-text" style="color: var(--text-secondary); font-size: 13px; line-height: 1.6;"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal" id="btn-tour-prev">Previous</button>
+        <button class="btn-modal btn-modal-primary" id="btn-tour-next">Next</button>
+        <button class="btn-modal" id="btn-close-tour">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NASA Solar System Treks & Cesium Mars Feature Inspection Modal -->
+  <div class="modal-overlay hidden" id="inspection-dialog">
+    <div class="modal-dialog inspection-dialog-card" style="max-width: 640px;">
+      <div class="modal-header inspection-header">
+        <div class="header-title-box">
+          <span class="trek-badge">NASA SOLAR SYSTEM TREKS // CESIUM MARS</span>
+          <h2 class="modal-title" id="inspection-place-name">INSIGHT LANDING SITE</h2>
+        </div>
+        <button class="win-btn" id="btn-close-inspection" aria-label="Close feature inspection">
+          <span id="icon-close-inspection"></span>
+        </button>
+      </div>
+      <div class="modal-body inspection-body">
+        <!-- High-Resolution Site Imagery with Carousel Controls -->
+        <div class="inspection-viewport">
+          <button class="carousel-nav-btn prev" id="btn-inspect-prev" aria-label="Previous site">‹</button>
+          <div class="inspection-image-container">
+            <img id="inspection-photo" class="inspection-photo" src="" alt="Mars surface feature photographic view">
+            <div class="inspection-photo-caption" id="inspection-photo-caption">High-Resolution Orbital / Surface Imaging</div>
+          </div>
+          <button class="carousel-nav-btn next" id="btn-inspect-next" aria-label="Next site">›</button>
+        </div>
+
+        <!-- Carousel Indicators -->
+        <div class="carousel-indicator-bar" id="inspection-indicators"></div>
+
+        <!-- Narrative Description -->
+        <p class="inspection-narrative" id="inspection-narrative"></p>
+
+        <!-- Science & Telemetry Specs Grid -->
+        <div class="inspection-specs-grid">
+          <div class="spec-cell">
+            <span class="spec-label">COORDINATES</span>
+            <span class="spec-val" id="inspection-coords">--</span>
+          </div>
+          <div class="spec-cell">
+            <span class="spec-label">ELEVATION (DATUM)</span>
+            <span class="spec-val" id="inspection-elevation">--</span>
+          </div>
+          <div class="spec-cell">
+            <span class="spec-label">FEATURE TYPE</span>
+            <span class="spec-val" id="inspection-type">--</span>
+          </div>
+          <div class="spec-cell">
+            <span class="spec-label">MISSION RECORD</span>
+            <span class="spec-val" id="inspection-record">--</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer inspection-footer">
+        <button class="btn-pill btn-pill-primary" id="btn-inspect-set-dest">Set as Destination</button>
+        <button class="btn-pill" id="btn-inspect-show-globe">Show on Globe</button>
+        <a class="btn-pill btn-pill-trek" id="btn-inspect-open-trek" target="_blank" rel="noopener noreferrer">Explore Site Features</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Application Script -->
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
